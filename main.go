@@ -38,7 +38,7 @@ func main() {
 		resposeString, err := updateDuckDNS(config)
 
 		if err != nil {
-			log("Failed to update DuckDNS: " + err.Error())
+			logError("Failed to update DuckDNS", err)
 			time.Sleep(1 * time.Minute)
 			continue
 		}
@@ -46,17 +46,13 @@ func main() {
 		response, err := parseResponse(resposeString)
 
 		if err != nil {
-			log("Failed to parse DuckDNS response: " + err.Error())
+			logError("Failed to parse DuckDNS response", err)
 			time.Sleep(1 * time.Minute)
 			continue
 		}
 
 		if config.Log {
-			line := formatLog(config, response)
-
-			if line != "" {
-				log(line)
-			}
+			logResponse(config, response)
 		}
 
 		// Sleep for 5 minutes
@@ -64,29 +60,74 @@ func main() {
 	}
 }
 
-func formatLog(config *Config, res *OkResponse) string {
+type Timestamp int64
+
+func (t Timestamp) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + time.Unix(int64(t), 0).UTC().Format("2006-01-02T15:04:05Z") + "\""), nil
+}
+
+type LogEntry struct {
+	Level     string    `json:"level"`
+	Timestamp Timestamp `json:"timestamp"`
+	Message   string    `json:"message"`
+	Updated   bool      `json:"updated"`
+	IPv4      string    `json:"ipv4,omitempty"`
+	IPv6      string    `json:"ipv6,omitempty"`
+}
+
+func logResponse(config *Config, res *OkResponse) {
 	if !res.Updated && !config.VerboseLog {
+		return
+	}
+
+	var message string
+	if res.Updated {
+		message = "Updated"
+	} else if config.VerboseLog {
+		message = "No change"
+	}
+
+	entry := createLogEntry("info", message)
+
+	entry.Updated = res.Updated
+	entry.IPv4 = res.IPv4
+	entry.IPv6 = res.IPv6
+
+	log(formatLog(entry), os.Stdout)
+}
+
+func logError(message string, err error) {
+	if err != nil {
+		message += ": " + err.Error()
+	}
+
+	log(formatLog(createLogEntry("error", message)), os.Stderr)
+}
+
+func createLogEntry(level string, message string) *LogEntry {
+	return &LogEntry{
+		Timestamp: Timestamp(time.Now().UTC().Unix()),
+		Level:     level,
+		Message:   message,
+	}
+}
+
+func formatLog(entry *LogEntry) string {
+	jsonBytes, err := json.Marshal(entry)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to format log entry", err)
 		return ""
 	}
 
-	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05")
-	message := timestamp + " - "
-
-	if res.Updated {
-		message += "Updated: "
-	} else if config.VerboseLog {
-		message += "No change: "
-	}
-
-	if res.IPv6 == "" {
-		return message + res.IPv4
-	}
-
-	return message + res.IPv4 + " / " + res.IPv6
+	return string(jsonBytes)
 }
 
-func log(line string) {
-	println(line)
+func log(line string, output *os.File) {
+	if line == "" {
+		return
+	}
+
+	fmt.Fprintln(output, line)
 
 	date := time.Now().UTC().Format("01-2006")
 	fileName := "log-" + date + ".log"
@@ -104,7 +145,7 @@ func log(line string) {
 func loadConfig() *Config {
 	file, err := os.Open("/data/config.json")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+		logError("Failed to open config file", err)
 		return nil
 	}
 
@@ -112,7 +153,7 @@ func loadConfig() *Config {
 	var config Config
 	err = json.NewDecoder(file).Decode(&config)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+		logError("Failed to parse config file", err)
 		return nil
 	}
 
@@ -123,17 +164,17 @@ func validateConfig(config *Config) bool {
 	valid := true
 
 	if config.Token == "" {
-		fmt.Fprintln(os.Stderr, "Token is required")
+		logError("Token is required", nil)
 		valid = false
 	}
 
 	if len(config.Domains) == 0 {
-		fmt.Fprintln(os.Stderr, "At least one subdomain is required")
+		logError("At least one subdomain is required", nil)
 		valid = false
 	}
 
 	if config.Interval == 0 {
-		fmt.Fprintln(os.Stderr, "Interval is required")
+		logError("Interval is required", nil)
 		valid = false
 	}
 
