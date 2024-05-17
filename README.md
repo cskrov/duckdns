@@ -1,0 +1,2 @@
+# duckdns
+DuckDNS updater
