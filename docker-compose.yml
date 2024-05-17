@@ -1,0 +1,10 @@
+version: '3'
+services:
+  duckdns:
+    image: duckdns:latest
+    container_name: duckdns
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Oslo
+    volumes:
+      - ./data:/data
