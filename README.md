@@ -23,7 +23,7 @@ Your DuckDNS token.
 The interval in seconds between updates/checks.
 
 #### `log`
-Whether to log IP changes to `/data/log-{month}-{year}.log` or not.
+Whether to log IP changes to `/data/logs/log-{month}-{year}.log` or not.
 
 #### `log_verbose`
 _Has no effect if `log` is `false`._
