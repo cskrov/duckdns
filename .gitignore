@@ -21,4 +21,5 @@
 go.work
 
 # Project
+.DS_Store
 data/
