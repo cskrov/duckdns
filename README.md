@@ -1,7 +1,9 @@
 # DuckDNS updater
 A simple DuckDNS updater meant to be run in a container.
-It assumes full control over the `/data` directory. Make sure to mount it to a persistent volume.
-It requires a `config.json` file in the `/data` directory. The file should look like this:
+It expects the config file to be mounted to `/data/config.json`. Logs will be written to `/data/logs`.
+
+
+The config file should look like this:
 ```json
 {
   "domains": ["yourdomain", "yourotherdomain"],
